@@ -9,10 +9,25 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ["**/*.{ts,tsx}"],
+    files: ["apps/frontend/**/*.{ts,tsx}"],
     languageOptions: {
       globals: {
-        ...globals.browser,
+        ...globals.browser
+      }
+    }
+  },
+  {
+    files: ["apps/backend/**/*.ts"],
+    languageOptions: {
+      globals: {
+        ...globals.node
+      }
+    }
+  },
+  {
+    files: ["packages/shared/**/*.ts"],
+    languageOptions: {
+      globals: {
         ...globals.node
       }
     }

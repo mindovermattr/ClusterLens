@@ -1,11 +1,41 @@
-import type { ConnectionStatus } from "@clusterlens/shared";
+import type { ConnectionStatus, SmokeClusterSnapshot } from "@clusterlens/shared";
 
 type ClusterWebSocketClientOptions = {
   url: string;
   WebSocketConstructor?: typeof WebSocket;
   onStatusChange: (status: ConnectionStatus) => void;
-  onSnapshot: (snapshot: unknown) => void;
+  onSnapshot: (snapshot: SmokeClusterSnapshot) => void;
 };
+
+function isSmokeClusterSnapshot(message: unknown): message is SmokeClusterSnapshot {
+  if (!message || typeof message !== "object") {
+    return false;
+  }
+
+  const candidate = message as {
+    type?: unknown;
+    cluster?: {
+      id?: unknown;
+      nodes?: unknown;
+    };
+  };
+
+  return (
+    candidate.type === "snapshot" &&
+    typeof candidate.cluster?.id === "string" &&
+    Array.isArray(candidate.cluster.nodes) &&
+    candidate.cluster.nodes.every((node) => {
+      const candidateNode = node as { id?: unknown; status?: unknown };
+
+      return (
+        !!node &&
+        typeof node === "object" &&
+        typeof candidateNode.id === "string" &&
+        candidateNode.status === "online"
+      );
+    })
+  );
+}
 
 export function createClusterWebSocketClient(options: ClusterWebSocketClientOptions) {
   const WebSocketConstructor = options.WebSocketConstructor ?? WebSocket;
@@ -31,7 +61,7 @@ export function createClusterWebSocketClient(options: ClusterWebSocketClientOpti
     try {
       const message = JSON.parse(data);
 
-      if (message.type === "snapshot") {
+      if (isSmokeClusterSnapshot(message)) {
         options.onSnapshot(message);
       }
     } catch {

@@ -10,6 +10,12 @@ Install dependencies:
 pnpm install
 ```
 
+Install dependencies from the lockfile in CI-style environments:
+
+```bash
+pnpm bootstrap
+```
+
 Build every workspace package:
 
 ```bash
