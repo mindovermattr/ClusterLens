@@ -1,18 +1,18 @@
 import { useEffect, useState } from "react";
-import type { ConnectionStatus, SmokeClusterSnapshot } from "@clusterlens/shared";
+import type { ClusterSnapshot, ConnectionStatus } from "@clusterlens/shared";
 import { createClusterWebSocketClient } from "../api/websocketClient";
 
 const backendWebSocketUrl = import.meta.env.VITE_BACKEND_WS_URL ?? "ws://127.0.0.1:4173/ws";
 
 export function App() {
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
-  const [snapshot, setSnapshot] = useState<SmokeClusterSnapshot | null>(null);
+  const [snapshot, setSnapshot] = useState<ClusterSnapshot | null>(null);
 
   useEffect(() => {
     const client = createClusterWebSocketClient({
       url: backendWebSocketUrl,
       onStatusChange: setStatus,
-      onSnapshot: (message) => setSnapshot(message as SmokeClusterSnapshot)
+      onSnapshot: setSnapshot
     });
 
     return () => client.close();

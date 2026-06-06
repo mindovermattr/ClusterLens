@@ -23,14 +23,42 @@ describe("websocket server", () => {
 
     expect(JSON.parse(message.toString())).toEqual({
       type: "snapshot",
-      cluster: {
-        id: "smoke-cluster",
+      state: {
+        timeMs: 0,
+        running: false,
+        leaderId: "node-c",
         nodes: [
-          { id: "node-a", status: "online" },
-          { id: "node-b", status: "online" },
-          { id: "node-c", status: "online" }
-        ]
+          { id: "node-a", role: "follower", status: "alive" },
+          { id: "node-b", role: "follower", status: "alive" },
+          { id: "node-c", role: "leader", status: "alive" }
+        ],
+        network: {
+          latencyMs: 200,
+          packetLossRate: 0,
+          partitions: [],
+          messages: []
+        }
       }
+    });
+  });
+
+  test("returns an error event for invalid client commands", async () => {
+    const server = await createHttpServer();
+    servers.push(server);
+
+    const address = await server.listen({ port: 0, host: "127.0.0.1" });
+    const url = address.replace("http://", "ws://");
+    const socket = new WebSocket(`${url}/ws`);
+
+    await once(socket, "message");
+    socket.send(JSON.stringify({ type: "node:kill" }));
+
+    const [message] = await once(socket, "message");
+    socket.close();
+
+    expect(JSON.parse(message.toString())).toEqual({
+      type: "error",
+      message: "Invalid client command"
     });
   });
 });
