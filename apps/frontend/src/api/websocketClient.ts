@@ -25,18 +25,30 @@ export function createClusterWebSocketClient(options: ClusterWebSocketClientOpti
   }
 
   function connect(): void {
+    if (
+      socket &&
+      (socket.readyState === WebSocketConstructor.CONNECTING || socket.readyState === WebSocketConstructor.OPEN)
+    ) {
+      return;
+    }
+
     clearReconnectTimer();
     closedByClient = false;
     options.onStatusChange("connecting");
 
-    socket = new WebSocketConstructor(options.url);
+    const currentSocket = new WebSocketConstructor(options.url);
+    socket = currentSocket;
 
-    socket.addEventListener("open", () => {
+    currentSocket.addEventListener("open", () => {
       reconnectAttempt = 0;
       options.onStatusChange("connected");
     });
 
-    socket.addEventListener("close", () => {
+    currentSocket.addEventListener("close", () => {
+      if (socket === currentSocket) {
+        socket = null;
+      }
+
       options.onStatusChange("disconnected");
 
       if (!closedByClient) {
@@ -46,11 +58,11 @@ export function createClusterWebSocketClient(options: ClusterWebSocketClientOpti
       }
     });
 
-    socket.addEventListener("error", () => {
-      options.onStatusChange("disconnected");
+    currentSocket.addEventListener("error", () => {
+      currentSocket.close();
     });
 
-    socket.addEventListener("message", (event) => {
+    currentSocket.addEventListener("message", (event) => {
       const data = typeof event.data === "string" ? event.data : "";
       const message = parseServerEvent(data);
 

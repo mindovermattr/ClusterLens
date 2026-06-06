@@ -31,6 +31,10 @@ class TestWebSocket extends EventTarget {
     this.dispatchEvent(new Event("open"));
   }
 
+  emitError(): void {
+    this.dispatchEvent(new Event("error"));
+  }
+
   emitMessage(data: string): void {
     this.dispatchEvent(new MessageEvent("message", { data }));
   }
@@ -150,6 +154,51 @@ describe("createClusterWebSocketClient", () => {
 
     vi.advanceTimersByTime(1000);
 
+    expect(TestWebSocket.instances).toHaveLength(2);
+    expect(attempts).toEqual([1]);
+    expect(statuses).toEqual(["connecting", "connected", "disconnected", "connecting"]);
+
+    client.disconnect();
+    vi.useRealTimers();
+  });
+
+  test("does not create duplicate sockets when connect is called repeatedly", () => {
+    const client = createClusterWebSocketClient({
+      url: "ws://127.0.0.1:4173/ws",
+      WebSocketConstructor: TestWebSocket as unknown as typeof WebSocket,
+      onStatusChange: () => {},
+      onSnapshot: () => {}
+    });
+
+    client.connect();
+    const socket = TestWebSocket.instances.at(-1)!;
+    socket.emitOpen();
+    client.connect();
+
+    expect(TestWebSocket.instances).toHaveLength(1);
+  });
+
+  test("closes errored sockets and reconnects through the close handler", () => {
+    vi.useFakeTimers();
+    const statuses: string[] = [];
+    const attempts: number[] = [];
+
+    const client = createClusterWebSocketClient({
+      url: "ws://127.0.0.1:4173/ws",
+      WebSocketConstructor: TestWebSocket as unknown as typeof WebSocket,
+      reconnectDelayMs: 1000,
+      onReconnectAttempt: (attempt) => attempts.push(attempt),
+      onStatusChange: (status) => statuses.push(status),
+      onSnapshot: () => {}
+    });
+
+    const socket = TestWebSocket.instances.at(-1)!;
+    socket.emitOpen();
+    socket.emitError();
+
+    vi.advanceTimersByTime(1000);
+
+    expect(socket.readyState).toBe(TestWebSocket.CLOSED);
     expect(TestWebSocket.instances).toHaveLength(2);
     expect(attempts).toEqual([1]);
     expect(statuses).toEqual(["connecting", "connected", "disconnected", "connecting"]);

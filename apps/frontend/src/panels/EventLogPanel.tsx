@@ -25,8 +25,12 @@ export function EventLogPanel({ entries }: EventLogPanelProps) {
           entries
             .slice()
             .reverse()
-            .map((entry) => (
-              <div className="event-row" role="row" key={`${entry.timestampMs}-${entry.eventType}-${entry.message}`}>
+            .map((entry, index) => (
+              <div
+                className="event-row"
+                role="row"
+                key={`${entry.timestampMs}-${entry.eventType}-${entry.source ?? "none"}-${entry.target ?? "none"}-${entry.message}-${index}`}
+              >
                 <span role="cell">{formatDurationMs(entry.timestampMs)}</span>
                 <span role="cell">{entry.eventType}</span>
                 <span role="cell">{entry.source ?? "-"}</span>
