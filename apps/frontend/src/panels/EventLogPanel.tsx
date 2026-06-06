@@ -23,13 +23,13 @@ export function EventLogPanel({ entries }: EventLogPanelProps) {
         </div>
         {entries.length ? (
           entries
-            .slice()
+            .map((entry, originalIndex) => ({ entry, originalIndex }))
             .reverse()
-            .map((entry, index) => (
+            .map(({ entry, originalIndex }) => (
               <div
                 className="event-row"
                 role="row"
-                key={`${entry.timestampMs}-${entry.eventType}-${entry.source ?? "none"}-${entry.target ?? "none"}-${entry.message}-${index}`}
+                key={`${entry.timestampMs}-${entry.eventType}-${entry.source ?? "none"}-${entry.target ?? "none"}-${entry.message}-${originalIndex}`}
               >
                 <span role="cell">{formatDurationMs(entry.timestampMs)}</span>
                 <span role="cell">{entry.eventType}</span>

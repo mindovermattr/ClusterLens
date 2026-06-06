@@ -40,15 +40,20 @@ export function createClusterWebSocketClient(options: ClusterWebSocketClientOpti
     socket = currentSocket;
 
     currentSocket.addEventListener("open", () => {
+      if (socket !== currentSocket) {
+        return;
+      }
+
       reconnectAttempt = 0;
       options.onStatusChange("connected");
     });
 
     currentSocket.addEventListener("close", () => {
-      if (socket === currentSocket) {
-        socket = null;
+      if (socket !== currentSocket) {
+        return;
       }
 
+      socket = null;
       options.onStatusChange("disconnected");
 
       if (!closedByClient) {
@@ -59,10 +64,18 @@ export function createClusterWebSocketClient(options: ClusterWebSocketClientOpti
     });
 
     currentSocket.addEventListener("error", () => {
+      if (socket !== currentSocket) {
+        return;
+      }
+
       currentSocket.close();
     });
 
     currentSocket.addEventListener("message", (event) => {
+      if (socket !== currentSocket) {
+        return;
+      }
+
       const data = typeof event.data === "string" ? event.data : "";
       const message = parseServerEvent(data);
 
@@ -79,8 +92,10 @@ export function createClusterWebSocketClient(options: ClusterWebSocketClientOpti
     disconnect() {
       closedByClient = true;
       clearReconnectTimer();
-      socket?.close();
+      const currentSocket = socket;
       socket = null;
+      currentSocket?.close();
+      options.onStatusChange("disconnected");
     },
     sendCommand(command: ClientCommand) {
       if (!socket || socket.readyState !== WebSocketConstructor.OPEN) {

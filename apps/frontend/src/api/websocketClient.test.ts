@@ -206,4 +206,67 @@ describe("createClusterWebSocketClient", () => {
     client.disconnect();
     vi.useRealTimers();
   });
+
+  test("ignores stale socket close after a newer socket is active", () => {
+    vi.useFakeTimers();
+    const statuses: string[] = [];
+    const attempts: number[] = [];
+
+    const client = createClusterWebSocketClient({
+      url: "ws://127.0.0.1:4173/ws",
+      WebSocketConstructor: TestWebSocket as unknown as typeof WebSocket,
+      reconnectDelayMs: 1000,
+      onReconnectAttempt: (attempt) => attempts.push(attempt),
+      onStatusChange: (status) => statuses.push(status),
+      onSnapshot: () => {}
+    });
+
+    const firstSocket = TestWebSocket.instances.at(-1)!;
+    firstSocket.emitOpen();
+    firstSocket.close();
+    vi.advanceTimersByTime(1000);
+
+    const secondSocket = TestWebSocket.instances.at(-1)!;
+    secondSocket.emitOpen();
+    firstSocket.close();
+    vi.advanceTimersByTime(1000);
+
+    expect(TestWebSocket.instances).toHaveLength(2);
+    expect(attempts).toEqual([1]);
+    expect(statuses).toEqual(["connecting", "connected", "disconnected", "connecting", "connected"]);
+
+    client.disconnect();
+    vi.useRealTimers();
+  });
+
+  test("ignores stale socket messages after replacement and disconnect", () => {
+    vi.useFakeTimers();
+    const snapshots: ClusterSnapshot[] = [];
+
+    const client = createClusterWebSocketClient({
+      url: "ws://127.0.0.1:4173/ws",
+      WebSocketConstructor: TestWebSocket as unknown as typeof WebSocket,
+      reconnectDelayMs: 1000,
+      onStatusChange: () => {},
+      onSnapshot: (snapshot) => snapshots.push(snapshot)
+    });
+
+    const firstSocket = TestWebSocket.instances.at(-1)!;
+    firstSocket.emitOpen();
+    firstSocket.close();
+    vi.advanceTimersByTime(1000);
+
+    const secondSocket = TestWebSocket.instances.at(-1)!;
+    secondSocket.emitOpen();
+    firstSocket.emitMessage(
+      '{"type":"snapshot","state":{"timeMs":0,"running":false,"leaderId":null,"nodes":[],"network":{"latencyMs":200,"packetLossRate":0,"partitions":[],"messages":[]}}}'
+    );
+    client.disconnect();
+    secondSocket.emitMessage(
+      '{"type":"snapshot","state":{"timeMs":100,"running":true,"leaderId":null,"nodes":[],"network":{"latencyMs":200,"packetLossRate":0,"partitions":[],"messages":[]}}}'
+    );
+
+    expect(snapshots).toEqual([]);
+    vi.useRealTimers();
+  });
 });
