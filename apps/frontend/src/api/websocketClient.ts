@@ -89,6 +89,14 @@ export function createClusterWebSocketClient(options: ClusterWebSocketClientOpti
 
   return {
     connect,
+    reconnect() {
+      closedByClient = true;
+      clearReconnectTimer();
+      const currentSocket = socket;
+      socket = null;
+      currentSocket?.close();
+      connect();
+    },
     disconnect() {
       closedByClient = true;
       clearReconnectTimer();

@@ -178,6 +178,43 @@ describe("createClusterWebSocketClient", () => {
     expect(TestWebSocket.instances).toHaveLength(1);
   });
 
+  test("explicit reconnect replaces the active socket without duplicate timers", () => {
+    vi.useFakeTimers();
+    const statuses: string[] = [];
+    const attempts: number[] = [];
+    const snapshots: ClusterSnapshot[] = [];
+
+    const client = createClusterWebSocketClient({
+      url: "ws://127.0.0.1:4173/ws",
+      WebSocketConstructor: TestWebSocket as unknown as typeof WebSocket,
+      reconnectDelayMs: 1000,
+      onReconnectAttempt: (attempt) => attempts.push(attempt),
+      onStatusChange: (status) => statuses.push(status),
+      onSnapshot: (snapshot) => snapshots.push(snapshot)
+    });
+
+    const firstSocket = TestWebSocket.instances.at(-1)!;
+    firstSocket.emitOpen();
+
+    client.reconnect();
+
+    const secondSocket = TestWebSocket.instances.at(-1)!;
+    firstSocket.emitMessage(
+      '{"type":"snapshot","state":{"timeMs":0,"running":false,"leaderId":null,"nodes":[],"network":{"latencyMs":200,"packetLossRate":0,"partitions":[],"messages":[]}}}'
+    );
+    vi.advanceTimersByTime(1000);
+
+    expect(firstSocket.readyState).toBe(TestWebSocket.CLOSED);
+    expect(secondSocket).not.toBe(firstSocket);
+    expect(TestWebSocket.instances).toHaveLength(2);
+    expect(attempts).toEqual([]);
+    expect(snapshots).toEqual([]);
+    expect(statuses).toEqual(["connecting", "connected", "connecting"]);
+
+    client.disconnect();
+    vi.useRealTimers();
+  });
+
   test("closes errored sockets and reconnects through the close handler", () => {
     vi.useFakeTimers();
     const statuses: string[] = [];
