@@ -4,6 +4,7 @@ import { useClusterStore } from "./store";
 import { ControlPanel } from "../panels/ControlPanel";
 import { ClusterStatePanel } from "../panels/ClusterStatePanel";
 import { EventLogPanel } from "../panels/EventLogPanel";
+import { ClusterScene } from "../scene/ClusterScene";
 import type { ClientCommand } from "../domain/types";
 
 const backendWebSocketUrl = import.meta.env.VITE_BACKEND_WS_URL ?? "ws://127.0.0.1:4173/ws";
@@ -14,6 +15,7 @@ export function App() {
   const connectionStatus = useClusterStore((state) => state.connectionStatus);
   const reconnectAttempt = useClusterStore((state) => state.reconnectAttempt);
   const snapshot = useClusterStore((state) => state.snapshot);
+  const activeMessages = useClusterStore((state) => state.activeMessages);
   const eventLog = useClusterStore((state) => state.eventLog);
   const selectedNodeId = useClusterStore((state) => state.selectedNodeId);
   const latencyDraftMs = useClusterStore((state) => state.latencyDraftMs);
@@ -79,16 +81,26 @@ export function App() {
         {lastError ? <p className="error-banner">{lastError}</p> : null}
       </header>
 
-      <div className="panel-grid">
-        <ControlPanel
-          connectionStatus={connectionStatus}
+      <div className="workspace-grid">
+        <ClusterScene
           snapshot={snapshot}
+          activeMessages={activeMessages}
           selectedNodeId={selectedNodeId}
-          latencyDraftMs={latencyDraftMs}
-          onLatencyDraftChange={setLatencyDraftMs}
-          onCommand={sendCommand}
+          onSelectNode={setSelectedNodeId}
         />
-        <ClusterStatePanel snapshot={snapshot} selectedNodeId={selectedNodeId} onSelectNode={setSelectedNodeId} />
+
+        <div className="side-panel-stack">
+          <ControlPanel
+            connectionStatus={connectionStatus}
+            snapshot={snapshot}
+            selectedNodeId={selectedNodeId}
+            latencyDraftMs={latencyDraftMs}
+            onLatencyDraftChange={setLatencyDraftMs}
+            onCommand={sendCommand}
+          />
+          <ClusterStatePanel snapshot={snapshot} selectedNodeId={selectedNodeId} onSelectNode={setSelectedNodeId} />
+        </div>
+
         <EventLogPanel entries={eventLog} />
       </div>
     </main>

@@ -12,9 +12,11 @@
   },
   "dependencies": {
     "@clusterlens/shared": "workspace:*",
+    "@react-three/fiber": "^9.6.1",
     "@vitejs/plugin-react": "^4.3.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "three": "^0.184.0",
     "vite": "^6.0.5",
     "zustand": "^5.0.14"
   },
@@ -22,6 +24,7 @@
     "@testing-library/react": "^16.1.0",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
+    "@types/three": "^0.184.1",
     "jsdom": "^25.0.1",
     "vitest": "^2.1.8"
   }

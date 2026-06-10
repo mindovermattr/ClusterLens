@@ -3,6 +3,7 @@ import type {
   ClusterSnapshot,
   ConnectionStatus,
   EventLogEntry,
+  NetworkPartitionSnapshot,
   NetworkMessageSnapshot,
   NodeSnapshot
 } from "@clusterlens/shared";
@@ -12,6 +13,7 @@ export type {
   ClusterSnapshot,
   ConnectionStatus,
   EventLogEntry,
+  NetworkPartitionSnapshot,
   NetworkMessageSnapshot,
   NodeSnapshot
 };

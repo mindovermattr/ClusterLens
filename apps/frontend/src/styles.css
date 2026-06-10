@@ -92,11 +92,16 @@ h3 {
   color: #8a1f1f;
 }
 
-.panel-grid {
+.workspace-grid {
   display: grid;
-  grid-template-columns: minmax(260px, 320px) minmax(360px, 1fr);
+  grid-template-columns: minmax(440px, 1fr) minmax(300px, 360px);
   gap: 16px;
   align-items: start;
+}
+
+.side-panel-stack {
+  display: grid;
+  gap: 16px;
 }
 
 .panel {
@@ -115,6 +120,51 @@ h3 {
   border-bottom: 1px solid #e3e8ef;
   color: #5a6572;
   font-size: 13px;
+}
+
+.scene-panel {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #d4dae2;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgb(27 31 36 / 6%);
+}
+
+.scene-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #e3e8ef;
+}
+
+.scene-panel-header p {
+  margin-top: 4px;
+  color: #5f6b79;
+  font-size: 13px;
+}
+
+.scene-canvas {
+  width: 100%;
+  height: clamp(460px, 62vh, 720px);
+}
+
+.scene-canvas canvas {
+  display: block;
+}
+
+.partition-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fff2d7;
+  color: #92500e;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .control-panel {
@@ -301,8 +351,12 @@ dd {
     display: grid;
   }
 
-  .panel-grid {
+  .workspace-grid {
     grid-template-columns: 1fr;
+  }
+
+  .scene-canvas {
+    height: 420px;
   }
 
   .event-panel {
