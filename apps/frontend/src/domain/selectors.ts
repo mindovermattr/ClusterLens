@@ -17,17 +17,25 @@ export function selectSelectedNode(snapshot: ClusterSnapshot | null, selectedNod
 }
 
 export function selectPartitionGroups(snapshot: ClusterSnapshot | null, selectedNodeId: string | null): string[][] | null {
-  if (!snapshot || !selectedNodeId) {
+  if (!snapshot || snapshot.nodes.length < 2) {
     return null;
   }
 
-  const otherNodeIds = snapshot.nodes.map((node) => node.id).filter((nodeId) => nodeId !== selectedNodeId);
+  const nodeIds = snapshot.nodes.map((node) => node.id);
+  const selectedIndex = selectedNodeId ? nodeIds.indexOf(selectedNodeId) : -1;
+  const companionNodeId =
+    selectedIndex >= 0 ? nodeIds.find((nodeId) => nodeId !== selectedNodeId) : null;
+  const firstGroup =
+    selectedIndex >= 0 && selectedNodeId && companionNodeId
+      ? [selectedNodeId, companionNodeId]
+      : nodeIds.slice(0, Math.min(2, nodeIds.length - 1));
+  const otherNodeIds = nodeIds.filter((nodeId) => !firstGroup.includes(nodeId));
 
   if (otherNodeIds.length === 0) {
     return null;
   }
 
-  return [[selectedNodeId], otherNodeIds];
+  return [firstGroup, otherNodeIds];
 }
 
 export function formatDurationMs(timeMs: number | null | undefined): string {

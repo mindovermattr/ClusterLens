@@ -63,7 +63,10 @@ describe("SimulationEngine", () => {
     engine.applyCommand({ type: CLIENT_COMMAND_TYPES.NODE_KILL, nodeId: "node-2" });
     engine.applyCommand({ type: CLIENT_COMMAND_TYPES.NODE_RESTORE, nodeId: "node-2" });
     engine.applyCommand({ type: CLIENT_COMMAND_TYPES.NETWORK_SET_LATENCY, latencyMs: 75 });
-    engine.applyCommand({ type: CLIENT_COMMAND_TYPES.NETWORK_CREATE_PARTITION, groups: [["node-1"], ["node-3"]] });
+    engine.applyCommand({
+      type: CLIENT_COMMAND_TYPES.NETWORK_CREATE_PARTITION,
+      groups: [["node-1", "node-2"], ["node-3", "node-4", "node-5"]]
+    });
     engine.applyCommand({ type: CLIENT_COMMAND_TYPES.NETWORK_HEAL_PARTITION });
     engine.applyCommand({ type: CLIENT_COMMAND_TYPES.SIMULATION_RESET });
 
@@ -91,15 +94,24 @@ describe("SimulationEngine", () => {
     });
     expect(onEvent).toHaveBeenCalledWith({
       type: "event_log",
-      entry: expect.objectContaining({ eventType: "latency_changed", message: "Network latency set to 75ms" })
+      entry: expect.objectContaining({
+        eventType: "latency_changed",
+        message: "Network latency set to 75ms; new messages will use this delivery delay"
+      })
     });
     expect(onEvent).toHaveBeenCalledWith({
       type: "event_log",
-      entry: expect.objectContaining({ eventType: "partition_created", message: "Network partition created" })
+      entry: expect.objectContaining({
+        eventType: "partition_created",
+        message: "Network partition created: node-1, node-2 | node-3, node-4, node-5; cross-group messages will drop"
+      })
     });
     expect(onEvent).toHaveBeenCalledWith({
       type: "event_log",
-      entry: expect.objectContaining({ eventType: "partition_healed", message: "Network partition healed" })
+      entry: expect.objectContaining({
+        eventType: "partition_healed",
+        message: "Network partition healed; cross-group messages can deliver again"
+      })
     });
   });
 
@@ -137,12 +149,93 @@ describe("SimulationEngine", () => {
   test("creates and heals network partitions", () => {
     const engine = new SimulationEngine();
 
-    expect(engine.applyCommand({ type: CLIENT_COMMAND_TYPES.NETWORK_CREATE_PARTITION, groups: [["node-1"], ["node-2"]] })).toEqual({
-      ok: true
-    });
-    expect(engine.getSnapshot().network.partitions).toEqual([{ groups: [["node-1"], ["node-2"]] }]);
+    expect(
+      engine.applyCommand({
+        type: CLIENT_COMMAND_TYPES.NETWORK_CREATE_PARTITION,
+        groups: [["node-1", "node-2"], ["node-3", "node-4", "node-5"]]
+      })
+    ).toEqual({ ok: true });
+    expect(engine.getSnapshot().network.partitions).toEqual([
+      { groups: [["node-1", "node-2"], ["node-3", "node-4", "node-5"]] }
+    ]);
 
     expect(engine.applyCommand({ type: CLIENT_COMMAND_TYPES.NETWORK_HEAL_PARTITION })).toEqual({ ok: true });
+    expect(engine.getSnapshot().network.partitions).toEqual([]);
+  });
+
+  test("validates failure and network commands", () => {
+    const engine = new SimulationEngine();
+
+    expect(engine.applyCommand({ type: CLIENT_COMMAND_TYPES.NODE_RESTORE, nodeId: "node-1" })).toEqual({
+      ok: false,
+      error: { type: "error", message: "Node node-1 is already alive" }
+    });
+
+    expect(engine.applyCommand({ type: CLIENT_COMMAND_TYPES.NODE_KILL, nodeId: "node-1" })).toEqual({ ok: true });
+    expect(engine.applyCommand({ type: CLIENT_COMMAND_TYPES.NODE_KILL, nodeId: "node-1" })).toEqual({
+      ok: false,
+      error: { type: "error", message: "Node node-1 is already down" }
+    });
+
+    expect(
+      engine.applyCommand({
+        type: CLIENT_COMMAND_TYPES.NETWORK_CREATE_PARTITION,
+        groups: [["node-1", "node-2"], ["node-3", "missing-node"]]
+      })
+    ).toEqual({
+      ok: false,
+      error: { type: "error", message: "Unknown node id in partition: missing-node" }
+    });
+
+    expect(
+      engine.applyCommand({
+        type: CLIENT_COMMAND_TYPES.NETWORK_CREATE_PARTITION,
+        groups: [["node-1", "node-2"], ["node-1", "node-3"]]
+      })
+    ).toEqual({
+      ok: false,
+      error: { type: "error", message: "Partition groups must not contain duplicate node ids" }
+    });
+
+    expect(engine.applyCommand({ type: CLIENT_COMMAND_TYPES.NETWORK_HEAL_PARTITION })).toEqual({
+      ok: false,
+      error: { type: "error", message: "No active partition to heal" }
+    });
+  });
+
+  test("rejects invalid network partitions", () => {
+    const engine = new SimulationEngine();
+
+    expect(
+      engine.applyCommand({ type: CLIENT_COMMAND_TYPES.NETWORK_CREATE_PARTITION, groups: [["node-1"], ["node-1"]] })
+    ).toEqual({
+      ok: false,
+      error: {
+        type: "error",
+        message: "Partition groups must not contain duplicate node ids"
+      }
+    });
+
+    expect(
+      engine.applyCommand({ type: CLIENT_COMMAND_TYPES.NETWORK_CREATE_PARTITION, groups: [["node-1"], ["missing-node"]] })
+    ).toEqual({
+      ok: false,
+      error: {
+        type: "error",
+        message: "Unknown node id in partition: missing-node"
+      }
+    });
+
+    expect(
+      engine.applyCommand({ type: CLIENT_COMMAND_TYPES.NETWORK_CREATE_PARTITION, groups: [["node-1"], ["node-2"]] })
+    ).toEqual({
+      ok: false,
+      error: {
+        type: "error",
+        message: "Partition groups must include every cluster node"
+      }
+    });
+
     expect(engine.getSnapshot().network.partitions).toEqual([]);
   });
 

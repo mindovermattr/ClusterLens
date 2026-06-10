@@ -85,6 +85,7 @@ describe("createClusterWebSocketClient", () => {
   test("handles all server event types and ignores malformed messages", () => {
     const snapshots: ClusterSnapshot[] = [];
     const deliveredMessages: string[] = [];
+    const droppedMessages: string[] = [];
     const errors: string[] = [];
 
     createClusterWebSocketClient({
@@ -93,6 +94,7 @@ describe("createClusterWebSocketClient", () => {
       onStatusChange: () => {},
       onSnapshot: (snapshot) => snapshots.push(snapshot),
       onMessageDelivered: (messageId) => deliveredMessages.push(messageId),
+      onMessageDropped: (messageId) => droppedMessages.push(messageId),
       onErrorEvent: (event) => errors.push(event.message)
     });
 
@@ -102,6 +104,7 @@ describe("createClusterWebSocketClient", () => {
       '{"type":"message_sent","message":{"id":"message-1","type":"heartbeat","sourceNodeId":"node-a","targetNodeId":"node-b","sentAtMs":0,"deliverAtMs":200,"status":"pending"}}'
     );
     socket?.emitMessage('{"type":"message_delivered","messageId":"message-1"}');
+    socket?.emitMessage('{"type":"message_dropped","messageId":"message-2"}');
     socket?.emitMessage('{"type":"leader_changed","leaderId":"node-a"}');
     socket?.emitMessage(
       '{"type":"event_log","entry":{"timestampMs":0,"eventType":"leader_changed","source":"node-a","target":null,"message":"node-a became leader"}}'
@@ -113,6 +116,7 @@ describe("createClusterWebSocketClient", () => {
 
     expect(snapshots).toEqual([]);
     expect(deliveredMessages).toEqual(["message-1"]);
+    expect(droppedMessages).toEqual(["message-2"]);
     expect(errors).toEqual(["Invalid client command"]);
   });
 

@@ -24,6 +24,10 @@ export const ServerEventSchema = z.discriminatedUnion("type", [
     messageId: z.string()
   }),
   z.object({
+    type: z.literal("message_dropped"),
+    messageId: z.string()
+  }),
+  z.object({
     type: z.literal("leader_changed"),
     leaderId: z.string().nullable()
   }),

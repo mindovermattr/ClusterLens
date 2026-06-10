@@ -124,8 +124,14 @@ export class SimulationEngine {
       case CLIENT_COMMAND_TYPES.NODE_RESTORE:
         return this.restoreNode(command.nodeId);
       case CLIENT_COMMAND_TYPES.NETWORK_SET_LATENCY:
+        if (!Number.isFinite(command.latencyMs) || command.latencyMs < 0) {
+          return this.commandError("Latency must be a non-negative finite number");
+        }
         this.cluster.setLatency(command.latencyMs);
-        this.emitEventLog("latency_changed", `Network latency set to ${command.latencyMs}ms`);
+        this.emitEventLog(
+          "latency_changed",
+          `Network latency set to ${command.latencyMs}ms; new messages will use this delivery delay`
+        );
         this.emitSnapshot();
         return { ok: true };
       case CLIENT_COMMAND_TYPES.NETWORK_CREATE_PARTITION:
@@ -160,6 +166,16 @@ export class SimulationEngine {
 
   private killNode(nodeId: string): CommandResult {
     const previousLeaderId = this.cluster.leaderId;
+    const existingNode = this.cluster.getNode(nodeId);
+
+    if (!existingNode) {
+      return this.commandError(`Unknown node id: ${nodeId}`);
+    }
+
+    if (existingNode.status === "down") {
+      return this.commandError(`Node ${nodeId} is already down`);
+    }
+
     const node = this.cluster.killNode(nodeId);
     if (!node) {
       return this.commandError(`Unknown node id: ${nodeId}`);
@@ -171,33 +187,86 @@ export class SimulationEngine {
     }
     this.nodeBehavior.onStop(this.cluster.getNode(nodeId));
     this.emit({ type: "node_updated", node });
-    this.emitEventLog("node_killed", `Node ${nodeId} killed`, { source: nodeId });
+    this.emitEventLog("node_killed", `Node ${nodeId} killed; it stops sending and receiving messages`, { source: nodeId });
     this.emitSnapshot();
     return { ok: true };
   }
 
   private restoreNode(nodeId: string): CommandResult {
+    const existingNode = this.cluster.getNode(nodeId);
+
+    if (!existingNode) {
+      return this.commandError(`Unknown node id: ${nodeId}`);
+    }
+
+    if (existingNode.status === "alive") {
+      return this.commandError(`Node ${nodeId} is already alive`);
+    }
+
     const node = this.cluster.restoreNode(nodeId);
     if (!node) {
       return this.commandError(`Unknown node id: ${nodeId}`);
     }
 
     this.emit({ type: "node_updated", node });
-    this.emitEventLog("node_restored", `Node ${nodeId} restored`, { source: nodeId });
+    this.emitEventLog("node_restored", `Node ${nodeId} restored; it can rejoin cluster traffic`, { source: nodeId });
     this.emitSnapshot();
     return { ok: true };
   }
 
   private createPartition(groups: string[][]): CommandResult {
-    this.cluster.network.partitions = [{ groups: groups.map((group) => [...group]) }];
-    this.emitEventLog("partition_created", "Network partition created");
+    if (this.cluster.network.partitions.length > 0) {
+      return this.commandError("Network partition is already active");
+    }
+
+    if (groups.length < 2) {
+      return this.commandError("Partition requires at least two groups");
+    }
+
+    const normalizedGroups = groups.map((group) => [...group]);
+    const nodeIds = new Set(this.cluster.nodes.keys());
+    const seenNodeIds = new Set<string>();
+
+    for (const group of normalizedGroups) {
+      if (group.length === 0) {
+        return this.commandError("Partition groups must not be empty");
+      }
+
+      for (const nodeId of group) {
+        if (!nodeIds.has(nodeId)) {
+          return this.commandError(`Unknown node id in partition: ${nodeId}`);
+        }
+
+        if (seenNodeIds.has(nodeId)) {
+          return this.commandError("Partition groups must not contain duplicate node ids");
+        }
+
+        seenNodeIds.add(nodeId);
+      }
+    }
+
+    if (seenNodeIds.size !== nodeIds.size) {
+      return this.commandError("Partition groups must include every cluster node");
+    }
+
+    this.cluster.network.partitions = [{ groups: normalizedGroups }];
+    this.emitEventLog(
+      "partition_created",
+      `Network partition created: ${normalizedGroups
+        .map((group) => group.join(", "))
+        .join(" | ")}; cross-group messages will drop`
+    );
     this.emitSnapshot();
     return { ok: true };
   }
 
   private healPartition(): CommandResult {
+    if (this.cluster.network.partitions.length === 0) {
+      return this.commandError("No active partition to heal");
+    }
+
     this.cluster.network.partitions = [];
-    this.emitEventLog("partition_healed", "Network partition healed");
+    this.emitEventLog("partition_healed", "Network partition healed; cross-group messages can deliver again");
     this.emitSnapshot();
     return { ok: true };
   }

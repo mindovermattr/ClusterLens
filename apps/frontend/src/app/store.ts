@@ -17,6 +17,7 @@ type ClusterStoreState = {
   activeMessages: NetworkMessageSnapshot[];
   selectedNodeId: string | null;
   latencyDraftMs: number;
+  latencyDraftDirty: boolean;
   lastError: string | null;
   setConnectionStatus: (status: ConnectionStatus) => void;
   setReconnectAttempt: (attempt: number) => void;
@@ -26,6 +27,7 @@ type ClusterStoreState = {
   handleNodeUpdated: (node: NodeSnapshot) => void;
   handleMessageSent: (message: NetworkMessageSnapshot) => void;
   handleMessageDelivered: (messageId: string) => void;
+  handleMessageDropped: (messageId: string) => void;
   handleLeaderChanged: (leaderId: string | null) => void;
   handleEventLog: (entry: EventLogEntry) => void;
   handleError: (message: string) => void;
@@ -40,6 +42,7 @@ const initialState = {
   activeMessages: [],
   selectedNodeId: null,
   latencyDraftMs: 200,
+  latencyDraftDirty: false,
   lastError: null
 };
 
@@ -66,15 +69,21 @@ export const useClusterStore = create<ClusterStoreState>((set) => ({
   setConnectionStatus: (connectionStatus) => set({ connectionStatus }),
   setReconnectAttempt: (reconnectAttempt) => set({ reconnectAttempt }),
   setSelectedNodeId: (selectedNodeId) => set({ selectedNodeId }),
-  setLatencyDraftMs: (latencyDraftMs) => set({ latencyDraftMs }),
+  setLatencyDraftMs: (latencyDraftMs) => set({ latencyDraftMs, latencyDraftDirty: true }),
   handleSnapshot: (snapshot) =>
-    set((state) => ({
-      snapshot,
-      activeMessages: pendingMessages(snapshot.network.messages),
-      selectedNodeId: snapshot.nodes.some((node) => node.id === state.selectedNodeId) ? state.selectedNodeId : null,
-      latencyDraftMs: snapshot.network.latencyMs,
-      lastError: null
-    })),
+    set((state) => {
+      const latencyConfirmed = snapshot.network.latencyMs === state.latencyDraftMs;
+      const shouldSyncLatencyDraft = !state.latencyDraftDirty || latencyConfirmed;
+
+      return {
+        snapshot,
+        activeMessages: pendingMessages(snapshot.network.messages),
+        selectedNodeId: snapshot.nodes.some((node) => node.id === state.selectedNodeId) ? state.selectedNodeId : null,
+        latencyDraftMs: shouldSyncLatencyDraft ? snapshot.network.latencyMs : state.latencyDraftMs,
+        latencyDraftDirty: state.latencyDraftDirty && !latencyConfirmed,
+        lastError: null
+      };
+    }),
   handleNodeUpdated: (node) =>
     set((state) => {
       if (!state.snapshot) {
@@ -120,6 +129,21 @@ export const useClusterStore = create<ClusterStoreState>((set) => ({
               ...state.snapshot.network,
               messages: state.snapshot.network.messages.map((message) =>
                 message.id === messageId ? { ...message, status: "delivered" } : message
+              )
+            }
+          }
+        : state.snapshot
+    })),
+  handleMessageDropped: (messageId) =>
+    set((state) => ({
+      activeMessages: state.activeMessages.filter((message) => message.id !== messageId),
+      snapshot: state.snapshot
+        ? {
+            ...state.snapshot,
+            network: {
+              ...state.snapshot.network,
+              messages: state.snapshot.network.messages.map((message) =>
+                message.id === messageId ? { ...message, status: "dropped" } : message
               )
             }
           }

@@ -62,11 +62,34 @@ describe("cluster store", () => {
 
     useClusterStore.getState().handleNodeUpdated({ ...nodeA, status: "down" });
     useClusterStore.getState().handleLeaderChanged(null);
-    useClusterStore.getState().handleMessageDelivered("message-1");
+    useClusterStore.getState().handleMessageDropped("message-1");
 
     expect(useClusterStore.getState().snapshot?.nodes[0]).toEqual({ ...nodeA, status: "down" });
     expect(useClusterStore.getState().snapshot?.leaderId).toBeNull();
     expect(useClusterStore.getState().activeMessages).toEqual([]);
+    expect(useClusterStore.getState().snapshot?.network.messages[0]).toEqual({ ...pendingMessage, status: "dropped" });
+
+    useClusterStore.getState().handleMessageSent(pendingMessage);
+    useClusterStore.getState().handleMessageDelivered("message-1");
+
+    expect(useClusterStore.getState().snapshot?.network.messages[0]).toEqual({
+      ...pendingMessage,
+      status: "delivered"
+    });
+  });
+
+  test("keeps pending latency drafts until a snapshot confirms them", () => {
+    useClusterStore.getState().handleSnapshot(snapshot);
+    useClusterStore.getState().setLatencyDraftMs(500);
+
+    useClusterStore.getState().handleSnapshot({ ...snapshot, network: { ...snapshot.network, latencyMs: 200 } });
+
+    expect(useClusterStore.getState().latencyDraftMs).toBe(500);
+
+    useClusterStore.getState().handleSnapshot({ ...snapshot, network: { ...snapshot.network, latencyMs: 500 } });
+
+    expect(useClusterStore.getState().latencyDraftMs).toBe(500);
+    expect(useClusterStore.getState().latencyDraftDirty).toBe(false);
   });
 
   test("bounds the event log to the newest entries", () => {

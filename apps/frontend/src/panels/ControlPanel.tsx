@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import type { ClientCommand, ConnectionStatus } from "../domain/types";
 import { selectPartitionGroups } from "../domain/selectors";
 import type { ClusterSnapshot } from "../domain/types";
@@ -22,6 +23,23 @@ export function ControlPanel({
   const disconnected = connectionStatus !== "connected";
   const selectedNode = snapshot?.nodes.find((node) => node.id === selectedNodeId) ?? null;
   const partitionGroups = selectPartitionGroups(snapshot, selectedNodeId);
+  const hasActivePartition = (snapshot?.network.partitions.length ?? 0) > 0;
+  const hasSnapshot = Boolean(snapshot);
+  const currentLatencyMs = snapshot?.network.latencyMs ?? latencyDraftMs;
+
+  useEffect(() => {
+    if (disconnected || !hasSnapshot || latencyDraftMs === currentLatencyMs) {
+      return;
+    }
+
+    const debounceTimer = setTimeout(() => {
+      onCommand({ type: "network:setLatency", latencyMs: latencyDraftMs });
+    }, 250);
+
+    return () => {
+      clearTimeout(debounceTimer);
+    };
+  }, [currentLatencyMs, disconnected, hasSnapshot, latencyDraftMs, onCommand]);
 
   return (
     <section className="panel control-panel" aria-labelledby="controls-heading">
@@ -60,7 +78,10 @@ export function ControlPanel({
       </div>
 
       <label className="field">
-        <span>Latency {latencyDraftMs}ms</span>
+        <span>
+          Latency {latencyDraftMs}ms
+          {latencyDraftMs !== currentLatencyMs ? ` (current ${currentLatencyMs}ms)` : ""}
+        </span>
         <input
           type="range"
           min="0"
@@ -71,7 +92,6 @@ export function ControlPanel({
           onChange={(event) => {
             const latencyMs = Number(event.currentTarget.value);
             onLatencyDraftChange(latencyMs);
-            onCommand({ type: "network:setLatency", latencyMs });
           }}
         />
       </label>
@@ -79,12 +99,16 @@ export function ControlPanel({
       <div className="button-row">
         <button
           type="button"
-          disabled={disconnected || !partitionGroups}
+          disabled={disconnected || !partitionGroups || hasActivePartition}
           onClick={() => partitionGroups && onCommand({ type: "network:createPartition", groups: partitionGroups })}
         >
           Partition
         </button>
-        <button type="button" disabled={disconnected} onClick={() => onCommand({ type: "network:healPartition" })}>
+        <button
+          type="button"
+          disabled={disconnected || !hasActivePartition}
+          onClick={() => onCommand({ type: "network:healPartition" })}
+        >
           Heal
         </button>
       </div>

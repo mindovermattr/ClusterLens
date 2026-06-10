@@ -91,7 +91,7 @@ describe("websocket server", () => {
         eventType: "node_killed",
         source: "node-3",
         target: null,
-        message: "Node node-3 killed"
+        message: "Node node-3 killed; it stops sending and receiving messages"
       }
     });
   });

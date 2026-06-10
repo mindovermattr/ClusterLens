@@ -11,6 +11,16 @@ function roleLabel(node: NodeSnapshot): string {
   return `${node.role} / ${node.status}`;
 }
 
+function partitionLabel(snapshot: ClusterSnapshot | null): string {
+  if (!snapshot || snapshot.network.partitions.length === 0) {
+    return "healed";
+  }
+
+  return snapshot.network.partitions
+    .map((partition) => partition.groups.map((group) => group.join(", ")).join(" | "))
+    .join("; ");
+}
+
 export function ClusterStatePanel({ snapshot, selectedNodeId, onSelectNode }: ClusterStatePanelProps) {
   const leader = selectLeader(snapshot);
   const selectedNode = selectSelectedNode(snapshot, selectedNodeId);
@@ -34,6 +44,14 @@ export function ClusterStatePanel({ snapshot, selectedNodeId, onSelectNode }: Cl
         <div>
           <dt>Time</dt>
           <dd>{snapshot ? `${snapshot.timeMs}ms` : "unknown"}</dd>
+        </div>
+        <div>
+          <dt>Latency</dt>
+          <dd>{snapshot ? `${snapshot.network.latencyMs}ms` : "unknown"}</dd>
+        </div>
+        <div>
+          <dt>Partition</dt>
+          <dd>{partitionLabel(snapshot)}</dd>
         </div>
       </dl>
 

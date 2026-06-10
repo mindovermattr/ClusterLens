@@ -37,7 +37,8 @@ describe("Network", () => {
 
   test("drops messages to down nodes", () => {
     const cluster = new Cluster(2);
-    const network = new Network(cluster, vi.fn());
+    const onEvent = vi.fn();
+    const network = new Network(cluster, onEvent);
     cluster.killNode("node-2");
 
     network.send("election", "node-1", "node-2");
@@ -45,11 +46,23 @@ describe("Network", () => {
     cluster.advanceTime(200);
     expect(network.deliverDue()).toEqual([]);
     expect(cluster.network.messages[0]).toMatchObject({ status: "dropped" });
+    expect(onEvent).toHaveBeenCalledWith({
+      type: "message_dropped",
+      messageId: "message-1"
+    });
+    expect(onEvent).toHaveBeenCalledWith({
+      type: "event_log",
+      entry: expect.objectContaining({
+        eventType: "message_dropped",
+        message: "election dropped from node-1 to node-2 because target node is down"
+      })
+    });
   });
 
   test("blocks only cross-group partition traffic", () => {
     const cluster = new Cluster(3);
-    const network = new Network(cluster, vi.fn());
+    const onEvent = vi.fn();
+    const network = new Network(cluster, onEvent);
     cluster.network.partitions = [{ groups: [["node-1"], ["node-2"]] }];
 
     network.send("election", "node-1", "node-2");
@@ -63,6 +76,15 @@ describe("Network", () => {
       expect.objectContaining({ id: "message-1", status: "dropped" }),
       expect.objectContaining({ id: "message-2", status: "delivered" })
     ]);
+    expect(onEvent).toHaveBeenCalledWith({
+      type: "event_log",
+      entry: expect.objectContaining({
+        eventType: "message_dropped",
+        message: "election dropped from node-1 to node-2 because partition blocked delivery",
+        source: "node-1",
+        target: "node-2"
+      })
+    });
   });
 
   test("healing a partition lets new messages deliver", () => {

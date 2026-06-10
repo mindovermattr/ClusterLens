@@ -23,6 +23,7 @@ export const EventLogTypeSchema = z.enum([
   "partition_healed",
   "message_sent",
   "message_delivered",
+  "message_dropped",
   "leader_changed",
   "heartbeat_timeout"
 ]);

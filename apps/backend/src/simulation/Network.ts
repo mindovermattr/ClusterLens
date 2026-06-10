@@ -36,8 +36,18 @@ export class Network {
         continue;
       }
 
-      if (!this.canDeliver(message.sourceNodeId, message.targetNodeId) || this.isLost()) {
+      const dropReason = this.getDropReason(message.sourceNodeId, message.targetNodeId);
+      const lossReason = dropReason ? null : this.getLossReason();
+
+      if (dropReason || lossReason) {
         message.status = "dropped";
+        this.emit({ type: "message_dropped", messageId: message.id });
+        this.emitEventLog(
+          "message_dropped",
+          `${message.type} dropped from ${message.sourceNodeId} to ${message.targetNodeId} because ${dropReason ?? lossReason}`,
+          message.sourceNodeId,
+          message.targetNodeId
+        );
         continue;
       }
 
@@ -56,9 +66,7 @@ export class Network {
   }
 
   public canDeliver(sourceNodeId: string, targetNodeId: string): boolean {
-    const source = this.cluster.getNode(sourceNodeId);
-    const target = this.cluster.getNode(targetNodeId);
-    return source?.status === "alive" && target?.status === "alive" && !this.isPartitioned(sourceNodeId, targetNodeId);
+    return this.getDropReason(sourceNodeId, targetNodeId) === null;
   }
 
   public isPartitioned(sourceNodeId: string, targetNodeId: string): boolean {
@@ -79,6 +87,29 @@ export class Network {
 
   private isLost(): boolean {
     return this.cluster.network.packetLossRate > 0 && Math.random() < this.cluster.network.packetLossRate;
+  }
+
+  private getDropReason(sourceNodeId: string, targetNodeId: string): string | null {
+    const source = this.cluster.getNode(sourceNodeId);
+    const target = this.cluster.getNode(targetNodeId);
+
+    if (source?.status !== "alive") {
+      return "source node is down";
+    }
+
+    if (target?.status !== "alive") {
+      return "target node is down";
+    }
+
+    if (this.isPartitioned(sourceNodeId, targetNodeId)) {
+      return "partition blocked delivery";
+    }
+
+    return null;
+  }
+
+  private getLossReason(): string | null {
+    return this.isLost() ? "packet loss triggered" : null;
   }
 
   private emitEventLog(

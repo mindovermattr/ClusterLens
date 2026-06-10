@@ -5,6 +5,7 @@ export type ServerEventHandlers = {
   onNodeUpdated?: (node: Extract<ServerEvent, { type: "node_updated" }>["node"]) => void;
   onMessageSent?: (message: Extract<ServerEvent, { type: "message_sent" }>["message"]) => void;
   onMessageDelivered?: (messageId: string) => void;
+  onMessageDropped?: (messageId: string) => void;
   onLeaderChanged?: (leaderId: string | null) => void;
   onEventLog?: (entry: Extract<ServerEvent, { type: "event_log" }>["entry"]) => void;
   onErrorEvent?: (event: Extract<ServerEvent, { type: "error" }>) => void;
@@ -37,6 +38,9 @@ export function handleServerEvent(event: ServerEvent, handlers: ServerEventHandl
       return;
     case "message_delivered":
       handlers.onMessageDelivered?.(event.messageId);
+      return;
+    case "message_dropped":
+      handlers.onMessageDropped?.(event.messageId);
       return;
     case "leader_changed":
       handlers.onLeaderChanged?.(event.leaderId);

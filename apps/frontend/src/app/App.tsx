@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { createClusterWebSocketClient } from "../api/websocketClient";
 import { useClusterStore } from "./store";
 import { ControlPanel } from "../panels/ControlPanel";
@@ -28,6 +28,7 @@ export function App() {
   const handleNodeUpdated = useClusterStore((state) => state.handleNodeUpdated);
   const handleMessageSent = useClusterStore((state) => state.handleMessageSent);
   const handleMessageDelivered = useClusterStore((state) => state.handleMessageDelivered);
+  const handleMessageDropped = useClusterStore((state) => state.handleMessageDropped);
   const handleLeaderChanged = useClusterStore((state) => state.handleLeaderChanged);
   const handleEventLog = useClusterStore((state) => state.handleEventLog);
   const handleError = useClusterStore((state) => state.handleError);
@@ -41,6 +42,7 @@ export function App() {
       onNodeUpdated: handleNodeUpdated,
       onMessageSent: handleMessageSent,
       onMessageDelivered: handleMessageDelivered,
+      onMessageDropped: handleMessageDropped,
       onLeaderChanged: handleLeaderChanged,
       onEventLog: handleEventLog,
       onErrorEvent: (event) => handleError(event.message)
@@ -57,6 +59,7 @@ export function App() {
     handleEventLog,
     handleLeaderChanged,
     handleMessageDelivered,
+    handleMessageDropped,
     handleMessageSent,
     handleNodeUpdated,
     handleSnapshot,
@@ -64,9 +67,9 @@ export function App() {
     setReconnectAttempt
   ]);
 
-  function sendCommand(command: ClientCommand): boolean {
+  const sendCommand = useCallback((command: ClientCommand): boolean => {
     return clientRef.current?.sendCommand(command) ?? false;
-  }
+  }, []);
 
   return (
     <main className="app-shell">
