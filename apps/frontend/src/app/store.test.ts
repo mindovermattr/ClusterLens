@@ -101,4 +101,14 @@ describe("cluster store", () => {
     expect(useClusterStore.getState().eventLog[0].message).toBe("event 5");
     expect(useClusterStore.getState().eventLog.at(-1)?.message).toBe(`event ${EVENT_LOG_LIMIT + 4}`);
   });
+
+  test("records errors and clears them on the next authoritative snapshot", () => {
+    useClusterStore.getState().handleError("Unknown node id: missing-node");
+
+    expect(useClusterStore.getState().lastError).toBe("Unknown node id: missing-node");
+
+    useClusterStore.getState().handleSnapshot(snapshot);
+
+    expect(useClusterStore.getState().lastError).toBeNull();
+  });
 });
